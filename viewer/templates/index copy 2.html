@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">    
+    <title>GLB Viewer</title>
+    <style>
+        body { display: flex; background-color: #bfe3dd; }
+        #sidebar { background: #000000; padding: 15px; max-height: 100vh; }
+        #container { flex: 1; display: flex; align-items: center; justify-content: center; }
+        canvas { display: block; }
+        .file-item, .image-item { cursor: pointer; margin: 10px; padding: 25px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .file-item:hover, .image-item:hover { background-color: #d5f1fd; }
+        .image-item img { width: 100px; height: auto; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h3>Input Images</h3>
+        <div id="image-list"></div>
+    </div>
+    <div id="container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+    <script type="module">
+        const container = document.getElementById('container');
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xbfe3dd);
+        scene.fog = new THREE.Fog(0xbfe3dd, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 100);
+        camera.position.set(5, 2, 8);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.5, 0);
+        controls.update();
+        controls.enablePan = false;
+        controls.enableDamping = true;
+
+        // LIGHTING
+        const ambientLight = new THREE.AmbientLight(0x404040, 2.0);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1);
+        directionalLight.position.set(5, 10, 7.5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        scene.add(directionalLight);
+
+        // GROUND
+        const gt = new THREE.TextureLoader().load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+        const gg = new THREE.PlaneGeometry(100, 100);
+        const gm = new THREE.MeshPhongMaterial({ color: 0xffffff, map: gt });
+
+        const ground = new THREE.Mesh(gg, gm);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -2.5;
+        ground.material.map.repeat.set(40, 40);
+        ground.material.map.wrapS = ground.material.map.wrapT = THREE.RepeatWrapping;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // ENVIRONMENT MAP
+        new THREE.RGBELoader()
+            .setDataType(THREE.UnsignedByteType)
+            .setPath('https://threejs.org/examples/textures/equirectangular/')
+            .load('royal_esplanade_1k.hdr', function(texture) {
+                const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.environment = envMap;
+                texture.dispose();
+                pmremGenerator.dispose();
+            });
+
+        const loader = new THREE.GLTFLoader();
+        let currentModel;
+        let mixer;
+
+        function loadGLBFile(url) {
+            if (currentModel) {
+                scene.remove(currentModel);
+                currentModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                });
+                mixer.stopAllAction();
+            }
+
+            loader.load(
+                url,
+                function (gltf) {
+                    currentModel = gltf.scene;
+                    currentModel.position.set(0, -2.5, 0);
+                    currentModel.scale.set(3, 3, 3);
+
+                    currentModel.traverse(function (child) {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+
+                    // Ensure the material properties are set correctly
+                    currentModel.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            if (child.material.color) {
+                                child.material.color.convertSRGBToLinear();
+                            }
+                            if (child.material.map) {
+                                child.material.map.encoding = THREE.sRGBEncoding;
+                            }
+                        }
+                    });
+
+                    scene.add(gltf.scene);
+
+                    mixer = new THREE.AnimationMixer(currentModel);
+                    gltf.animations.forEach((clip) => {
+                        mixer.clipAction(clip).play();
+                    });
+
+                    renderer.render(scene, camera);
+                },
+                undefined,
+                function (error) {
+                    console.error(error);
+                }
+            );
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            if (mixer) {
+                mixer.update(0.01);
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const imageList = document.getElementById('image-list');
+
+        fetch('/files')
+            .then(response => response.json())
+            .then(data => {
+                const { imageFiles } = data;
+                
+                imageFiles.forEach(file => {
+                    const div = document.createElement('div');
+                    div.className = 'image-item';
+                    const img = document.createElement('img');
+                    img.src = `/input/${file}`;
+                    div.appendChild(img);
+                    // Construct the GLB file path with '-merge' suffix
+                    const folderName = file.replace(/\.[^/.]+$/, "");
+                    const glbFile = `${folderName}/${folderName}-merge.glb`;
+                    div.onclick = () => loadGLBFile(`/output/${glbFile}`);
+                    imageList.appendChild(div);
+                });
+            })
+            .catch(error => console.error('Error fetching file list:', error));
+    </script>
+</body>
+</html>

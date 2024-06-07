@@ -1,0 +1,3 @@
+newmtl FaceTexture
+map_Kd 1717486175.png
+disp output/1717486175/1717486175_normals.png

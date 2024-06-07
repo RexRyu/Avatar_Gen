@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta charset="UTF-8">
+    <title>GLB Viewer</title>
+    <style>
+        body { display: flex; background-color: #bfe3dd; }
+        #sidebar { background: #000000; padding: 15px; max-height: 100vh; }
+        #container { flex: 1; display: flex; align-items: center; justify-content: center; }
+        canvas { display: block; }
+        .file-item, .image-item { cursor: pointer; margin: 10px; padding: 25px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        .file-item:hover, .image-item:hover { background-color: #d5f1fd; }
+        .image-item img { width: 100px; height: auto; }
+        #cameraButton { cursor: pointer; margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; color: white; background-color: #007bff; text-align: center; }
+        #cameraButton:hover { background-color: #0056b3; }
+        #speedControl { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div id="cameraButton">Open Camera</div>
+        <h3>Input Images</h3>
+        <div id="image-list"></div>
+        <select id="animation-select">
+            <option value="">Select Animation</option>
+        </select>
+    </div>
+    <div id="container"></div>
+    
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

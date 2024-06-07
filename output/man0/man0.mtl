@@ -1,0 +1,3 @@
+newmtl FaceTexture
+map_Kd man0.png
+disp output/man0/man0_normals.png
